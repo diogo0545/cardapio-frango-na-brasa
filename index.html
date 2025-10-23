@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Frango na Brasa — Cardápio do Dia</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+  <style>
+    :root{
+      --bg1:#b30000;
+      --bg2:#ffcc66;
+      --accent:#b30000;
+      --white: #fff;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+      background: linear-gradient(180deg,var(--bg1),var(--bg2));
+      color:var(--white);
+      min-height:100vh;
+      display:flex;
+      flex-direction:column;
+      align-items:center;
+      padding:18px;
+    }
+    .container{width:100%;max-width:920px;}
+    header{display:flex;align-items:center;gap:14px;margin-bottom:12px;justify-content:space-between}
+    .brand{display:flex;gap:12px;align-items:center}
+    .logo{font-size:34px}
+    h1{margin:0;font-size:1.4rem}
+    .date{font-size:0.95rem;opacity:0.95}
+    .whatsapp-btn{
+      background:#fff;color:var(--accent);border-radius:999px;padding:10px 14px;text-decoration:none;font-weight:700;display:inline-flex;gap:8px;align-items:center;
+    }
+    main{background:rgba(255,255,255,0.07);padding:18px;border-radius:16px;margin-top:10px}
+    .section-title{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+    .grid{display:grid;grid-template-columns:1fr;gap:10px}
+    @media(min-width:700px){ .grid{grid-template-columns: 1fr 1fr} }
+    .card{background:rgba(0,0,0,0.12);padding:12px;border-radius:12px;display:flex;flex-direction:column;gap:6px}
+    .item-row{display:flex;justify-content:space-between;align-items:center;gap:8px}
+    .item-name{font-weight:700}
+    .item-desc{font-size:0.9rem;opacity:0.95}
+    .price{font-weight:800}
+    .pedido-btn{background:transparent;border:1px solid #fff;padding:6px 10px;border-radius:10px;color:#fff;text-decoration:none;font-weight:700}
+    .small{font-size:0.88rem;opacity:0.95}
+    .hint{font-size:0.85rem;margin-top:6px;opacity:0.95}
+    footer{margin-top:16px;text-align:center;font-size:0.85rem;opacity:0.95}
+    .loading{padding:10px 0;text-align:center}
+    .msg-error{color:#ffdada;background:#8b0000;padding:10px;border-radius:8px;margin-top:8px}
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="brand">
+        <div class="logo"><i class="fa-solid fa-drumstick-bite"></i></div>
+        <div>
+          <h1>Frango na Brasa</h1>
+          <div class="date" id="dateDisplay">Carregando data...</div>
+        </div>
+      </div>
+      <div>
+        <a id="whatsappMain" class="whatsapp-btn" href="#" target="_blank" rel="noopener">
+          <i class="fa-brands fa-whatsapp"></i> Pedir pelo WhatsApp
+        </a>
+      </div>
+    </header>
+    <main>
+      <div class="section-title">
+        <h2>Cardápio do Dia</h2>
+        <div class="small" id="dailyCount">—</div>
+      </div>
+      <div id="dailyList" class="grid"></div>
+      <div style="height:10px"></div>
+      <div class="section-title">
+        <h2>Itens Fixos (Assados, Bebidas...)</h2>
+        <div class="small" id="fixedCount">—</div>
+      </div>
+      <div id="fixedList" class="grid"></div>
+      <div id="messages" class="hint"></div>
+    </main>
+    <footer>
+      © 2025 Frango na Brasa — Feito com ❤️ em Umuarama
+    </footer>
+  </div>
+
+  <script>
+    const SHEET_ID = '1-m80FSDF8GuP6JaK4XAYQrejkxG4PIUxkeVUvnt5GcQ';
+    const GID = '0';
+    const WHATSAPP_NUMBER = '5544997080939';
+
+    const dateDisplay = document.getElementById('dateDisplay');
+    const dailyList = document.getElementById('dailyList');
+    const fixedList = document.getElementById('fixedList');
+    const messages = document.getElementById('messages');
+    const dailyCount = document.getElementById('dailyCount');
+    const fixedCount = document.getElementById('fixedCount');
+    const whatsappMain = document.getElementById('whatsappMain');
+
+    whatsappMain.href = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent('Olá! Gostaria de saber o cardápio de hoje e fazer um pedido.')}`;
+
+    function formatDateBR(d){
+      const opts = { weekday:'long', day:'2-digit', month:'long', year:'numeric' };
+      return d.toLocaleDateString('pt-BR', opts);
+    }
+
+    function todayISO(){
+      const d = new Date();
+      const yyyy = d.getFullYear();
+      const mm = String(d.getMonth()+1).padStart(2,'0');
+      const dd = String(d.getDate()).padStart(2,'0');
+      return `${yyyy}-${mm}-${dd}`;
+    }
+
+    dateDisplay.textContent = `Cardápio de ${formatDateBR(new Date())}`;
+
+    async function fetchSheet(){
+      if(!SHEET_ID){
+        messages.innerHTML = '<div class="msg-error">Coloque o <strong>SHEET_ID</strong> no código e publique a planilha.</div>';
+        return [];
+      }
+      const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?gid=${GID}&headers=1`;
+      try{
+        const res = await fetch(url);
+        if(!res.ok) throw new Error('Erro ao acessar planilha. Verifique se publicou.');
+        const txt = await res.text();
+        const jsonText = txt.match(/setResponse\(([\s\S]*)\);/);
+        if(!jsonText) throw new Error('Formato inesperado da resposta.');
+        const data = JSON.parse(jsonText[1]);
+        const cols = data.table.cols.map(c => (c.label || c.id || '').toLowerCase());
+        const rows = data.table.rows.map(r => {
+          const obj = {};
+          r.c.forEach((cell,i) => {
+            const key = cols[i] || `col${i}`;
+            obj[key] = cell ? cell.v : '';
+          });
+          return obj;
+        });
+        return rows;
+      } catch(err){
+        console.error(err);
+        messages.innerHTML = `<div class="msg-error">Erro: ${err.message}.<br>Verifique se a planilha foi "Publicada na web" e se o ID está correto.</div>`;
+        return [];
+      }
+    }
+
+    function renderItems(items, container){
+      container.innerHTML = '';
+      if(items.length === 0){
+        container.innerHTML = '<div class="card"><div class="item-row">Nenhum item encontrado.</div></div>';
+        return;
+      }
+      items.forEach(it => {
+        const card = document.createElement('div');
+        card.className = 'card';
+        const name = document.createElement('div');
+        name.className = 'item-name';
+        name.textContent = it.name || '-';
+        const desc = document.createElement('div');
+        desc.className = 'item-desc';
+        desc.textContent = it.description || '';
+        const row = document.createElement('div');
+        row.className = 'item-row';
+        const left = document.createElement('div');
+        rightContainer = document.createElement('div');
+        left.appendChild(name);
+        if(it.description) left.appendChild(desc);
+        rightContainer.innerHTML = `<div style="text-align:right"><div class="price">${it.price || ''}</div>
+          <div style="margin-top:8px">
+            <a class="pedido-btn" target="_blank" rel="noopener" href="${waLinkForItem(it)}">Pedir</a>
+          </div></div>`;
+        row.appendChild(left);
+        row.appendChild(rightContainer);
+        card.appendChild(row);
+        container.appendChild(card);
+      });
+    }
+
+    function waLinkForItem(item){
+      const name = item.name || '';
+      const price = item.price || '';
+      const msg = `Olá! Gostaria de pedir: ${name} ${price ? ' — ' + price : ''}.`;
+      return `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(msg)}`;
+    }
+
+    function processRows(rows){
+      const normalized = rows.map(r => ({
+        date: (r.date || '').toString().trim(),
+        category: (r.category || '').toString().trim().toLowerCase(),
+        name: (r.name || '').toString().trim(),
+        description: (r.description || '').toString().trim(),
+        price: (r.price || '').toString().trim()
+      }));
+      const today = todayISO();
+      const daily = normalized.filter(r => r.category === 'daily' && (r.date === today));
+      const fixed = normalized.filter(r => r.category === 'fixed' || r.category === 'fixo' || r.date === '-' || r.date === '');
+      return { daily, fixed };
+    }
+
+    (async function init(){
+      messages.textContent = 'Carregando cardápio...';
+      const rows = await fetchSheet();
+      if(!rows || rows.length === 0){
+        messages.textContent = '';
+        dailyList.innerHTML = '<div class="card"><div class="item-row">Atualize a planilha com as colunas: date, category, name, description, price.</div></div>';
+        fixedList.innerHTML = '';
+        dailyCount.textContent = '0 itens';
+        fixedCount.textContent = '0 itens';
+        return;
+      }
+      const { daily, fixed } = processRows(rows);
+      renderItems(daily, dailyList);
+      renderItems(fixed, fixedList);
+      dailyCount.textContent = `${daily.length} item(s)`;
+      fixedCount.textContent = `${fixed.length} item(s)`;
+      messages.textContent = '';
+    })();
+  </script>
+</body>
+</html>
